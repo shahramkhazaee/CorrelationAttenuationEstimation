@@ -39,9 +39,9 @@ function [V, Ceff] = phaseVelocityHomogenized(Cloc, rho, homogType, tol)
     end
 
 
-    switch lower(string(homogType))
+    switch lower(char(homogType))
 
-        case "reuss"
+        case 'reuss'
             % Reuss (uniform stress) isotropic aggregate velocities from a 
             % general 6x6 stiffness C.
 
@@ -70,7 +70,7 @@ function [V, Ceff] = phaseVelocityHomogenized(Cloc, rho, homogType, tol)
 
             V = [sqrt(C11iso/rho); sqrt(C44iso/rho)];
 
-        case "voigt"
+        case 'voigt'
             % Voigt (uniform strain) isotropic aggregate velocities from a 
             % general 6x6 stiffness C.
 
@@ -96,7 +96,7 @@ function [V, Ceff] = phaseVelocityHomogenized(Cloc, rho, homogType, tol)
 
             V = [sqrt(C11iso/rho); sqrt(C44iso/rho)];
 
-        case {"sc","selfconsistent","self-consistent"}
+        case {'sc','selfconsistent','self-consistent'}
             % Self-consistent isotropic equivalent for a random polycrystal of cubic grains
             % using the notation and equations of Norouzian & Turner (JASA 2019).
 

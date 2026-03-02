@@ -66,7 +66,7 @@ prob_coverage = [0.0005, 0.9995];
 [PDF, bounds] = makeGrainDiameterPDF(PDF_type, mD, sD, prob_coverage);
 
 % Discretize grain size Domain
-Na = 2e3; % this could be modified to check the convergence
+Na = 5e3; % this could be modified to check the convergence
 a = linspace(bounds(1), bounds(2), Na);
 a = a(:); % ensure column vector
 
@@ -80,7 +80,8 @@ attcoeffs = attenuationCoefficientsWeaverMonodisperse(material, source);
 switch TPCF_type
     case 'sk'
         % E[D^3]
-        ED3 = integral(@(D) D.^3 .* PDF(D), bounds(1), bounds(2));
+        %ED3 = integral(@(D) D.^3 .* PDF(D), bounds(1), bounds(2));
+        ED3 = integral(@(D) D.^3 .* PDF(D), bounds(1), bounds(2), 'AbsTol', 1e-20, 'RelTol', 1e-6);
         % Volume weighted PDF to be used in the SK model
         pdf_vals = a.^3 .* PDF(a) / ED3;
     otherwise

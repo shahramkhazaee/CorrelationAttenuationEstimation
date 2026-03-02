@@ -93,7 +93,7 @@ N = @(x) nn.N0 + nn.N1 * x.^2;
 
 % TPCF/PSDF Definitions
 % PSDF(z) is the dimensionless Spectral Density where z = k*D_mean
-if strcmpi(TPCF_type,'exp')
+if strcmpi(TPCF_type,'exp') || strcmpi(TPCF_type,'arguelles')
 
     PSDF = @(z) 1./(8*pi^2) ./ (1 + z.^2/4).^2;
 
@@ -154,7 +154,7 @@ end
 % Helper function for the PSDF of the spherical case
 function y = psdfSpherical(z)
     y = zeros(size(z));
-    small = abs(z) < 1e-8;
+    small = abs(z) < 1e-4;
 
     zs = z(~small);
     y(~small) = 3 * (-zs.*cos(zs/2) + 2*sin(zs/2)).^2 ./ (pi^2 * zs.^6);

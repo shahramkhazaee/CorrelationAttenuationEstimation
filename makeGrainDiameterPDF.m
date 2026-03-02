@@ -61,7 +61,7 @@ else
             bounds = logninv(prob_coverage, mulnD, sigmalnD);
             PDF = @(x) lognpdf(x, mulnD, sigmalnD);
 
-        case 'normal'
+        case {'normal', 'gaussian'}
 
             bounds = norminv(prob_coverage, mD, sD);
             bounds(bounds < eps) = eps; % physical truncation
@@ -84,18 +84,23 @@ else
             catch
                 k = k_guess;
             end
-
+            
             lambda = mD / gamma(1 + 1/k);
             bounds = wblinv(prob_coverage, lambda, k);
             PDF = @(x) wblpdf(x, lambda, k);
 
         case {'truncated_normal','truncated_gaussian','truncatednormal', ...
                                                     'truncatedgaussian'}
-            
+
             % lower and upper bounds for the truncated distribution 
             % to be modified based on the case study
-            a = 10e-6;
-            b = 250e-6;
+            a = eps;
+            b = norminv(prob_coverage(2), mD, sD); % instead of Inf
+
+            % if b becomes Inf or NaN, set it to 5 standard deviations
+            if isinf(b) || isnan(b)
+                b = mD + 5*sD; 
+            end
             
             % normalization constant
             Z = normcdf(b,mD,sD) - normcdf(a,mD,sD);
@@ -114,8 +119,13 @@ else
             
             % lower and upper bounds for the truncated distribution 
             % to be modified based on the case study
-            a = 10e-6;
-            b = 250e-6;
+            a = eps;
+            b = logninv(prob_coverage(2), mD, sD); % instead of Inf
+
+            % if b becomes Inf or NaN, set it to 5 standard deviations
+            if isinf(b) || isnan(b)
+                b = mulnD + 5*sigmalnD; 
+            end
             
             Z = logncdf(b,mulnD,sigmalnD) - logncdf(a,mulnD,sigmalnD);
             
