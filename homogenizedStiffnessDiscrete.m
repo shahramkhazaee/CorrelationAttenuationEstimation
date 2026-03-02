@@ -54,18 +54,16 @@ function C_eff = homogenizedStiffnessDiscrete(C_rotated, vol_list, material, hom
                 C_eff = C_voigt;
             else
                 % Isotropic part of the local cubic stiffness: C^I
-                % lambda = c12, mu = c44
-                C_iso = stiffnessMatrix('iso', c11, c44) * 1e9; % Pa
+                % Note : c11^iso = c12 + 2*c44;  
+                C_iso = stiffnessMatrix('iso', c12 + 2*c44, c44) * 1e9; % Pa
 
                 % Solve for h from Eqs. (15)-(16)
-                h = selfConsistentCubicParams(c11, c12, c44);
+                h = selfConsistentCubicParam(c11, c12, c44);
 
                 % Isotropic part C^{I,sc} from Eq. (19)
                 lambda_sc = h*c11 + (1-h)*c12;   % GPa
                 mu_sc     = (1 + 2*h)*c44;       % GPa
-                c11_sc = lambda_sc + 2*mu_sc;    % GPa
-                c44_sc = mu_sc;                  % GPa
-                C_iso_sc  = stiffnessMatrix('iso', c11_sc, c44_sc) * 1e9; % Pa
+                C_iso_sc  = stiffnessMatrix('iso', lambda_sc + 2*mu_sc, mu_sc) * 1e9; % Pa
 
                 % Eq. (23c): C_eff^sc = C^{I,sc} + c_sc * <R>
                 % Since C_voigt = C^I + nu_c * <R>, we use:
@@ -86,7 +84,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Helper function for self consistent technique
-function h = selfConsistentCubicParams(c11, c12, c44)
+function h = selfConsistentCubicParam(c11, c12, c44)
 % Compute c44^sc and h for the cubic self-consistent scheme.
 %
 % Inputs are in GPa. Output c44_sc is in GPa, h is dimensionless.
