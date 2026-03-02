@@ -6,7 +6,7 @@ function C_eff = homogenizedStiffnessDiscrete(C_rotated, vol_list, material, hom
 %   C_rotated : 6x6xNg rotated grain stiffness matrices (Pa)
 %   vol_list  : Ngx1 grain volumes
 %   material  : material struct (elasticConstants in GPa)
-%   homoType  : 'voigt', 'reuss', or 'self-consistent'
+%   homoType  : 'voigt', 'reuss', 'hill' or 'self-consistent'
 %
 % Output
 %   C_eff     : 6x6 effective stiffness matrix (Pa)
@@ -28,12 +28,26 @@ function C_eff = homogenizedStiffnessDiscrete(C_rotated, vol_list, material, hom
             S_rotated = zeros(6,6,Ng);
 
             for ig = 1:Ng
-                % More stable than inv(C_rotated(:,:,ig))
+                % inv(C_rotated(:,:,ig))
                 S_rotated(:,:,ig) = C_rotated(:,:,ig) \ I6;
             end
 
             S_eff = (1/vol) * squeeze(sum(S_rotated .* w, 3));
             C_eff = S_eff \ I6;
+
+        case {'hill','h'}
+            Ng = size(C_rotated, 3);
+            S_rotated = zeros(6,6,Ng);
+
+            for ig = 1:Ng
+                % inv(C_rotated(:,:,ig))
+                S_rotated(:,:,ig) = C_rotated(:,:,ig) \ I6;
+            end
+
+            S_eff = (1/vol) * squeeze(sum(S_rotated .* w, 3));
+            C_eff = S_eff \ I6;
+
+            C_eff = 0.5 * (C_eff + C_voigt);
 
         case {'sc','selfconsistent','self-consistent'}
             % Implemented here for cubic crystals only, following Norouzian 2019a
