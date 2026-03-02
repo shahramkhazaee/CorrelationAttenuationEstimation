@@ -26,7 +26,7 @@ function [sigma,eta] = attenuationCoeffsWeaverDiscretized(Nreal, N, f, Np, Rmax,
 %                - vol_fname : base path/prefix used to read:
 %                              [vol_fname num2str(realID) '.stcell']
 %                              [vol_fname num2str(realID) '.stvox']
-%   homoType : homogenization technique: 'voigt', 'reuss', 'hill', 'sc'
+%   homoType : Homogenization type, 'voigt' | 'reuss' | 'hill' | 'sc'
 %   etta     : optional precomputed eta array of size [length(Nreal) x N]
 %
 % Outputs

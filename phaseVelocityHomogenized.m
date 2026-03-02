@@ -5,7 +5,7 @@ function [V, Ceff] = phaseVelocityHomogenized(Cloc, rho, homogType, tol)
 % Inputs:
 %   Cloc      [6x6] stiffness in Voigt notation (11,22,33,23,13,12), Pa
 %   rho       density, kg/m^3
-%   homogType 'voigt' | 'reuss' | 'sc'
+%   homogType 'voigt' | 'reuss' | 'hill' | 'sc'
 %   tol       relative tolerance for cubic check (default 1e-6)
 %
 % Outputs:
@@ -41,6 +41,32 @@ function [V, Ceff] = phaseVelocityHomogenized(Cloc, rho, homogType, tol)
 
     switch lower(char(homogType))
 
+        case 'voigt'
+            % Voigt (uniform strain) isotropic aggregate velocities from a 
+            % general 6x6 stiffness C.
+
+            % Enforce symmetry
+            C = 0.5 * (Cloc + Cloc.');
+
+            A = C(1,1) + C(2,2) + C(3,3);
+            B = C(1,2) + C(1,3) + C(2,3);
+            D = C(4,4) + C(5,5) + C(6,6);
+
+            % Eq. (15) of R. deWit
+            KV = (A + 2*B) / 9;       % Voigt bulk modulus
+            GV = (A - B + 3*D) / 15;  % Voigt shear modulus 
+
+            % Eq. (6) of R. deWit
+            C11iso = KV + (4/3)*GV;
+            C44iso = GV;
+            Ceff = stiffnessMatrix('iso', C11iso, C44iso);
+
+            if KV <= 0 || GV <= 0
+                error('Computed Voigt moduli are non-positive. Check C units/convention.');
+            end
+
+            V = [sqrt(C11iso/rho); sqrt(C44iso/rho)];
+
         case 'reuss'
             % Reuss (uniform stress) isotropic aggregate velocities from a 
             % general 6x6 stiffness C.
@@ -70,13 +96,13 @@ function [V, Ceff] = phaseVelocityHomogenized(Cloc, rho, homogType, tol)
 
             V = [sqrt(C11iso/rho); sqrt(C44iso/rho)];
 
-        case 'voigt'
-            % Voigt (uniform strain) isotropic aggregate velocities from a 
-            % general 6x6 stiffness C.
+        case 'hill'
+            % Average between Voigt & Reuss averages
 
             % Enforce symmetry
             C = 0.5 * (Cloc + Cloc.');
 
+            % Voigt average
             A = C(1,1) + C(2,2) + C(3,3);
             B = C(1,2) + C(1,3) + C(2,3);
             D = C(4,4) + C(5,5) + C(6,6);
@@ -85,16 +111,32 @@ function [V, Ceff] = phaseVelocityHomogenized(Cloc, rho, homogType, tol)
             KV = (A + 2*B) / 9;       % Voigt bulk modulus
             GV = (A - B + 3*D) / 15;  % Voigt shear modulus 
 
-            % Eq. (6) of R. deWit
-            C11iso = KV + (4/3)*GV;
-            C44iso = GV;
-            Ceff = stiffnessMatrix('iso', C11iso, C44iso);
-
             if KV <= 0 || GV <= 0
                 error('Computed Voigt moduli are non-positive. Check C units/convention.');
             end
 
-            V = [sqrt(C11iso/rho); sqrt(C44iso/rho)];
+            CeffV = stiffnessMatrix('iso', KV + (4/3)*GV, GV);
+            
+            % Reuss average
+            S = C \ eye(6);
+
+            A = S(1,1) + S(2,2) + S(3,3);
+            B = S(1,2) + S(1,3) + S(2,3);
+            D = S(4,4) + S(5,5) + S(6,6);
+
+            % Eq. (18) of R. deWit
+            KR = 1 / (A + 2*B);         % Reuss bulk modulus
+            GR = 15 / (4*(A-B) + 3*D);  % Reuss shear modulus
+
+            if KR <= 0 || GR <= 0
+                error('Computed Reuss moduli are non-positive. Check C units/convention.');
+            end
+
+            CeffR = stiffnessMatrix('iso', KR + (4/3)*GR, GR);
+
+            Ceff = 0.5 * (CeffV + CeffR);
+
+            V = [sqrt(Ceff(1,1)/rho); sqrt(Ceff(4,4)/rho)];
 
         case {'sc','selfconsistent','self-consistent'}
             % Self-consistent isotropic equivalent for a random polycrystal of cubic grains
