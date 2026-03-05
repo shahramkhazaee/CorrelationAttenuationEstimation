@@ -74,15 +74,16 @@ is2D = (Lz <= tolZ);
 % Clamp Rmax to reduce boundary rejections (same spirit as your 2D main function)
 if is2D
     Rmax_used = min(Rmax, 0.5 * min([Lx, Ly]));
-    % Build 2D interpolant: (x,y) -> voxel index
-    interp_function = scatteredInterpolant(coords(:,1), coords(:,2), ...
-                                (1:size(coords,1))', 'nearest', 'nearest');
+    % Build interpolant: (x,y) -> voxel index
+    ns = createns(coords(:,1:2), 'NSMethod','kdtree');
 else
     Rmax_used = min(Rmax, 0.5 * min([Lx, Ly, Lz]));
-    % Build 3D interpolant: (x,y,z) -> voxel index
-    interp_function = scatteredInterpolant(coords(:,1), coords(:,2), coords(:,3), ...
-                                (1:size(coords,1))', 'nearest', 'nearest');
+    % Build interpolant: (x,y,z) -> voxel index
+    ns = createns(coords, 'NSMethod','kdtree');
 end
+
+% nearest voxel index
+interp_function = @(q) knnsearch(ns, q);
 
 % Vector of lag distances and estimated TPCF values
 r = linspace(0, Rmax_used, Nr);
@@ -110,8 +111,8 @@ for i = 1:Nr
             continue;
         end
 
-        k1 = interp_function(x1v(:,1), x1v(:,2));
-        k2 = interp_function(x2v(:,1), x2v(:,2));
+        k1 = interp_function(x1v);
+        k2 = interp_function(x2v);
 
     else
         % Reference points uniformly in the box
@@ -136,13 +137,13 @@ for i = 1:Nr
             continue;
         end
 
-        k1 = interp_function(x1v(:,1), x1v(:,2), x1v(:,3));
-        k2 = interp_function(x2v(:,1), x2v(:,2), x2v(:,3));
+        k1 = interp_function(x1v);
+        k2 = interp_function(x2v);
     end
 
     eta(i) = mean(cell_id(k2) == cell_id(k1));
 
-    if rem(i, 10) == 0
+    if rem(i, 50) == 0
         disp(['calc:' num2str(i) '/' num2str(Nr) ' lag distances done!']);
     end
 end

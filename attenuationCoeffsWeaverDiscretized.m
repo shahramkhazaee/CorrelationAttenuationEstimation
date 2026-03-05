@@ -46,6 +46,84 @@ function [sigma,eta] = attenuationCoeffsWeaverDiscretized(Nreal, N, f, Np, Rmax,
 %   predictions for polycrystalline materials using three-dimensional 
 %   synthetic microstructures: Attenuation. JASA, 145(4), pp.2181-2191.
 %
+% Example
+% % -----------------------------
+% % Material (Al cubic, GPa / SI)
+% % -----------------------------
+% material = struct();
+% material.elasticConstants = [103.4, 57.1, 28.6]; % [c11 c12 c44] in GPa
+% material.density = 2700;                         % kg/m^3
+% 
+% % -----------------------------
+% % Directions (example)
+% % -----------------------------
+% theta_s = 45*pi/180;
+% vectors = struct();
+% vectors.inc_wave_vector = [0;0;1];
+% vectors.sca_wave_vector = [sin(theta_s); 0; cos(theta_s)];
+% 
+% vectors.inc_wave_vector = vectors.inc_wave_vector / norm(vectors.inc_wave_vector);
+% vectors.sca_wave_vector = vectors.sca_wave_vector / norm(vectors.sca_wave_vector);
+% 
+% % -----------------------------
+% % Files (test_1, test_2, test_3)
+% % -----------------------------
+% fnames = struct();
+% fnames.vol_fname = '3Dmonomodal_4000x500x500_Dbar75_deltaD20_sample';
+% 
+% % -----------------------------
+% % Numerical parameters
+% % -----------------------------
+% Nreal = 1:1;
+% N    = 1000;     % MC samples
+% Np   = 1e5;     % TPCF point pairs
+% Rmax = Inf;     % let code clip to geometry
+% 
+% % Frequency vector (Hz)
+% fvec = linspace(1e6, 10e6, 15);   % 1 to 10 MHz
+% nf   = numel(fvec);
+% 
+% % Storage: one value per frequency per realization
+% sigmaPP_all = zeros(nf, numel(Nreal));
+% 
+% % -----------------------------
+% % First call computes eta internally
+% % -----------------------------
+% fprintf('Computing first frequency (eta will be estimated internally)...\n');
+% [sigma, eta_cached] = attenuationCoeffsWeaverDiscretized(Nreal, N, fvec(1), Np, Rmax, material, vectors, fnames, 'Voigt');
+% sigmaPP_all(1,:) = sigma.sigmaPP(:).';
+% 
+% % -----------------------------
+% % Remaining frequencies reuse eta
+% % -----------------------------
+% for k = 2:nf
+%     fprintf('Frequency %d/%d : %.3f MHz\n', k, nf, fvec(k)*1e-6);
+%     sigma = attenuationCoeffsWeaverDiscretized(Nreal, N, fvec(k), Np, Rmax, material, vectors, fnames, 'Voigt', eta_cached);
+%     sigmaPP_all(k,:) = sigma.sigmaPP(:).';
+% end
+% 
+% % -----------------------------
+% % Plot (choose what you want to visualize)
+% % -----------------------------
+% sigmaPP_mean = mean(sigmaPP_all, 2);
+% 
+% figure;
+% plot(fvec*1e-6, abs(sigmaPP_mean), '-o');
+% xlabel('Frequency (MHz)');
+% ylabel('|mean(\sigma_{PP})|');
+% grid on;
+% title('\sigma_{PP} vs frequency (mean over realizations)');
+% 
+% % Optional: inspect real/imag parts
+% figure;
+% plot(fvec*1e-6, real(sigmaPP_mean), '-o', 'DisplayName', 'real'); hold on;
+% plot(fvec*1e-6, imag(sigmaPP_mean), '-s', 'DisplayName', 'imag');
+% xlabel('Frequency (MHz)');
+% ylabel('mean(\sigma_{PP})');
+% grid on;
+% legend('Location','best');
+% title('\sigma_{PP} (real / imag) vs frequency');
+
 % Read inputs
 % Material & Parameter Setup
 if numel(material.elasticConstants) == 3
@@ -261,7 +339,7 @@ function vox = read_stvox_domain(stvox_filename, Rmax)
 %   bounds          [3 x 2] = [xmin xmax; ymin ymax; zmin zmax]
 %   is2D            true if z-extent is (numerically) zero
 %   Rmax_used       min(Rmax, 0.5*min(domain lengths))
-%   interp_function scatteredInterpolant mapping (x,y[,z]) -> voxel index
+%   interp_function mapping function (x,y[,z]) -> voxel index
 
 stvox_filename = strtrim(string(stvox_filename));
 [~,~,ext] = fileparts(stvox_filename);
@@ -302,13 +380,13 @@ is2D = (Lz <= tolZ);
 
 if is2D
     Rmax_used = min(Rmax, 0.5 * min([Lx, Ly]));
-    interp_function = scatteredInterpolant(coords(:,1), coords(:,2), ...
-        (1:size(coords,1))', 'nearest', 'nearest');
+    ns = createns(coords(:,1:2), 'NSMethod','kdtree');
 else
     Rmax_used = min(Rmax, 0.5 * min([Lx, Ly, Lz]));
-    interp_function = scatteredInterpolant(coords(:,1), coords(:,2), coords(:,3), ...
-        (1:size(coords,1))', 'nearest', 'nearest');
+    ns = createns(coords, 'NSMethod','kdtree');
 end
+% nearest voxel index
+interp_function = @(q) knnsearch(ns, q);
 
 vox = struct();
 vox.cell_id = cell_id;
@@ -327,7 +405,7 @@ function w = TPCF_stationary_point(Np, r, theta, phi, interp_function, cell_id, 
 %   Np             : number of random pairs
 %   r              : lag distance (same unit as stvox coordinates)
 %   theta, phi     : direction angles (theta ignored in 2D)
-%   interp_function: scatteredInterpolant returning voxel row indices
+%   interp_function: mapping function (x,y[,z]) -> voxel index
 %   cell_id        : grain/cell IDs for each voxel row
 %   bounds         : [xmin xmax; ymin ymax; zmin zmax]
 %   is2D           : logical flag
@@ -349,32 +427,31 @@ if is2D
     x2 = x1 + dx;
 
     in = (x2(:,1) >= xmin) & (x2(:,1) <= xmax) & ...
-        (x2(:,2) >= ymin) & (x2(:,2) <= ymax);
+         (x2(:,2) >= ymin) & (x2(:,2) <= ymax);
 
     if ~any(in)
         w = NaN;
         return;
     end
 
-    k1 = interp_function(x1(in,1), x1(in,2));
-    k2 = interp_function(x2(in,1), x2(in,2));
-
+    k1 = interp_function(x1v);
+    k2 = interp_function(x2v);
 else
     x1 = [xmin + Lx*rand(Np,1), ymin + Ly*rand(Np,1), zmin + Lz*rand(Np,1)];
     dx = [r*sin(theta)*cos(phi), r*sin(theta)*sin(phi), r*cos(theta)];
     x2 = x1 + dx;
 
     in = (x2(:,1) >= xmin) & (x2(:,1) <= xmax) & ...
-        (x2(:,2) >= ymin) & (x2(:,2) <= ymax) & ...
-        (x2(:,3) >= zmin) & (x2(:,3) <= zmax);
+         (x2(:,2) >= ymin) & (x2(:,2) <= ymax) & ...
+         (x2(:,3) >= zmin) & (x2(:,3) <= zmax);
 
     if ~any(in)
         w = NaN;
         return;
     end
 
-    k1 = interp_function(x1(in,1), x1(in,2), x1(in,3));
-    k2 = interp_function(x2(in,1), x2(in,2), x2(in,3));
+    k1 = interp_function(x1v);
+    k2 = interp_function(x2v);
 end
 
 % Cleanup indices
