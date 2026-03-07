@@ -426,38 +426,33 @@ if is2D
     dx = [r*cos(phi), r*sin(phi)];
     x2 = x1 + dx;
 
-    in = (x2(:,1) >= xmin) & (x2(:,1) <= xmax) & ...
-         (x2(:,2) >= ymin) & (x2(:,2) <= ymax);
-
-    if ~any(in)
-        w = NaN;
-        return;
-    end
-
-    k1 = interp_function(x1v);
-    k2 = interp_function(x2v);
+    ind = (x2(:,1) >= xmin) & (x2(:,1) <= xmax) & ...
+          (x2(:,2) >= ymin) & (x2(:,2) <= ymax);
 else
     x1 = [xmin + Lx*rand(Np,1), ymin + Ly*rand(Np,1), zmin + Lz*rand(Np,1)];
     dx = [r*sin(theta)*cos(phi), r*sin(theta)*sin(phi), r*cos(theta)];
     x2 = x1 + dx;
 
-    in = (x2(:,1) >= xmin) & (x2(:,1) <= xmax) & ...
-         (x2(:,2) >= ymin) & (x2(:,2) <= ymax) & ...
-         (x2(:,3) >= zmin) & (x2(:,3) <= zmax);
-
-    if ~any(in)
-        w = NaN;
-        return;
-    end
-
-    k1 = interp_function(x1v);
-    k2 = interp_function(x2v);
+    ind = (x2(:,1) >= xmin) & (x2(:,1) <= xmax) & ...
+          (x2(:,2) >= ymin) & (x2(:,2) <= ymax) & ...
+          (x2(:,3) >= zmin) & (x2(:,3) <= zmax);
 end
 
+x1v = x1(ind,:);
+x2v = x2(ind,:);
+
+if ~any(ind)
+    w = NaN;
+    return;
+end
+
+k1 = interp_function(x1v);
+k2 = interp_function(x2v);
+
 % Cleanup indices
-ok = ~isnan(k1) & ~isnan(k2);
-k1 = k1(ok);
-k2 = k2(ok);
+ok1 = ~isnan(k1) & ~isnan(k2);
+k1 = k1(ok1);
+k2 = k2(ok1);
 
 if isempty(k1)
     w = NaN;
@@ -468,10 +463,10 @@ k1 = round(k1);
 k2 = round(k2);
 
 nV = numel(cell_id);
-ok = (k1 >= 1) & (k1 <= nV) & (k2 >= 1) & (k2 <= nV);
+ok2 = (k1 >= 1) & (k1 <= nV) & (k2 >= 1) & (k2 <= nV);
 
-k1 = k1(ok);
-k2 = k2(ok);
+k1 = k1(ok2);
+k2 = k2(ok2);
 
 if isempty(k1)
     w = NaN;
@@ -480,4 +475,5 @@ end
 
 % compare grain IDs
 w = mean(cell_id(k1) == cell_id(k2));
+
 end
