@@ -183,11 +183,14 @@ for j=1:length(Nreal)
     info_Neper = textscan(fid,'%f %*q %f %f %f %*[^\n]');
     fclose(fid);
 
-    vol_list = [info_Neper{1}];
+    % list of equivalent diameters and grain volumes
+    % note : volumes in Neper are in m^3
+    diam_list = [info_Neper{2}];
+    vol_list = pi/6 * diam_list.^3;
 
     % number of grains and volume of the sample
-    Ng = length(vol_list);
-    vol = sum(vol_list); % volumes in Neper are in micron^3 or m^3????
+    Ng = length(diam_list);
+    vol = sum(vol_list);
 
     % Read corresponding Neper voxel file to get true domain extents
     stvoxPath = [vol_fname num2str(rID) '.stvox'];
